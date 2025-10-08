@@ -2799,30 +2799,35 @@ Teacher ID: ${teacherId}`);
                                   }}
                                   className="cursor-pointer"
                                 >
-                              <div className="flex items-center justify-between mb-2">
-                                <span className="text-xs font-medium text-muted-foreground">
-                                  {period.time}
-                                </span>
-                                {period.room && (
-                                  <span className="text-xs text-muted-foreground bg-muted/30 px-2 py-1 rounded">
-                                    {period.room}
-                                  </span>
-                                )}
-                              </div>
+                                  {/* Pencil icon to indicate editability */}
+                                  <div className="absolute top-1 left-1 opacity-0 group-hover:opacity-100 transition-opacity text-gold">
+                                    <Edit className="h-4 w-4" />
+                                  </div>
+                                  
+                                  <div className="flex items-center justify-between mb-2">
+                                    <span className="text-xs font-medium text-muted-foreground">
+                                      {period.time}
+                                    </span>
+                                    {period.room && (
+                                      <span className="text-xs text-muted-foreground bg-muted/30 px-2 py-1 rounded">
+                                        {period.room}
+                                      </span>
+                                    )}
+                                  </div>
 
-                              <h5 className={`font-semibold mb-1 ${
-                                period.subject === 'Break' 
-                                  ? 'text-muted-foreground' 
-                                  : 'text-foreground'
-                              }`}>
-                                {period.subject}
-                              </h5>
+                                  <h5 className={`font-semibold mb-1 ${
+                                    period.subject === 'Break' 
+                                      ? 'text-muted-foreground' 
+                                      : 'text-foreground'
+                                  }`}>
+                                    {period.subject}
+                                  </h5>
 
-                              {period.teacher && (
-                                <p className="text-sm text-muted-foreground">
-                                  {period.teacher}
-                                </p>
-                              )}
+                                  {period.teacher && (
+                                    <p className="text-sm text-muted-foreground">
+                                      {period.teacher}
+                                    </p>
+                                  )}
                                 </div>
                               </div>
                             ));
@@ -2920,20 +2925,58 @@ Teacher ID: ${teacherId}`);
                       <Clock className="h-4 w-4 mr-2" />
                       Save Timetable
                     </Button>
-                    <Button variant="outline">
-                      <Eye className="h-4 w-4 mr-2" />
-                      Preview Timetable
-                    </Button>
-                    <Button variant="outline">
-                      <FileText className="h-4 w-4 mr-2" />
-                      Export to PDF
-                    </Button>
+                    {/* Delete All Periods Button */}
                     <Button 
                       variant="destructive"
+                      onClick={() => {
+                        if (confirm(`Delete all periods for Class ${selectedTimetableClass}${selectedTimetableSection}? This will clear the entire timetable but keep the structure.`)) {
+                          const timetableKey = `royal-academy-timetable-${selectedTimetableClass}${selectedTimetableSection}`;
+                          const existingTimetable = localStorage.getItem(timetableKey);
+
+                          if (existingTimetable) {
+                            const timetableData = JSON.parse(existingTimetable);
+                            
+                            // Clear all periods for each day
+                            if (timetableData.schedule && Array.isArray(timetableData.schedule)) {
+                              timetableData.schedule.forEach((daySchedule: any) => {
+                                if (daySchedule.periods) {
+                                  daySchedule.periods = [];
+                                }
+                              });
+                              
+                              // Update lastUpdated timestamp
+                              timetableData.lastUpdated = new Date().toISOString();
+                              
+                              // Save back to localStorage
+                              localStorage.setItem(timetableKey, JSON.stringify(timetableData));
+                              
+                              // Also save to Supabase
+                              setSupabaseData(timetableKey, timetableData);
+                              
+                              alert(`All periods cleared for Class ${selectedTimetableClass}${selectedTimetableSection}!`);
+                              // Force re-render to show empty state
+                              setSelectedTimetableClass(selectedTimetableClass);
+                            }
+                          } else {
+                            alert('No timetable found to clear.');
+                          }
+                        }
+                      }}
+                    >
+                      <X className="h-4 w-4 mr-2" />
+                      Clear All Periods
+                    </Button>
+                    {/* Delete Entire Timetable Button */}
+                    <Button 
+                      variant="outline"
                       onClick={() => {
                         if (confirm(`Delete entire timetable for Class ${selectedTimetableClass}${selectedTimetableSection}? This action cannot be undone.`)) {
                           const timetableKey = `royal-academy-timetable-${selectedTimetableClass}${selectedTimetableSection}`;
                           localStorage.removeItem(timetableKey);
+                          
+                          // Also remove from Supabase
+                          setSupabaseData(timetableKey, null);
+                          
                           alert(`Timetable deleted for Class ${selectedTimetableClass}${selectedTimetableSection}!`);
                           // Force re-render to show empty state
                           setSelectedTimetableClass(selectedTimetableClass);
@@ -2942,6 +2985,16 @@ Teacher ID: ${teacherId}`);
                     >
                       <X className="h-4 w-4 mr-2" />
                       Delete Timetable
+                    </Button>
+                    {/* Edit Periods Button */}
+                    <Button 
+                      variant="outline"
+                      onClick={() => {
+                        alert('To edit any period, simply click on the period in the timetable below. You can also add new periods using the "Add Period" button for each day.');
+                      }}
+                    >
+                      <Edit className="h-4 w-4 mr-2" />
+                      Edit Periods
                     </Button>
                   </div>
                 </div>
@@ -3032,6 +3085,7 @@ Teacher ID: ${teacherId}`);
                       if (existingTimetable && editingPeriod) {
                         const timetableData = JSON.parse(existingTimetable);
                         const daySchedule = timetableData.schedule?.find((d: any) => d.day === editingPeriod.day);
+
 
                         if (daySchedule) {
                           if (editingPeriod.index !== undefined) {
